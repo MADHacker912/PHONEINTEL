@@ -216,10 +216,12 @@ If you found this project useful:
 💡 Suggest new features
 
 ---
+# STAY ETHICAL, STAY SAFE
 
+---
 <p align="center">
 Made with ❤️ in Python
 </p>
+---
+---
 
-# STAY ETHICAL, STAY SAFE
-```
