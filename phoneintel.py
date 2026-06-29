@@ -4,7 +4,7 @@
   / /_/ / /_/ / / / /  |/ / __/  / //  |/ / / / / __/ / /  
  / ____/ __  / /_/ / /|  / /____/ // /|  / / / / /___/ /___
 /_/   /_/ /_/\____/_/ |_/_____/___/_/ |_/ /_/ /_____/_____/
-                                                          
+
 PhoneNum Locator - Track phone number location, carrier & generate map.
 Works on Termux (Android) and standard Linux/macOS terminals.
 Author: SAKSHAM GUPTA
@@ -12,21 +12,20 @@ Author: SAKSHAM GUPTA
 
 import sys
 import os
+import re
 import json
 import requests
 import phonenumbers
 from phonenumbers import geocoder, carrier, timezone
 from colorama import init, Fore, Style
 
-# Initialize colorama for cross-platform colored output
 init(autoreset=True)
 
-#  Configuration 
+# Configuration
 CONFIG_FILE = "config.py"
 OPENCAGE_API_KEY = None
 
 def load_config():
-    """Load API keys from config.py if it exists."""
     global OPENCAGE_API_KEY
     try:
         if os.path.exists(CONFIG_FILE):
@@ -77,24 +76,176 @@ COUNTRY_CODES = {
     "zambia": "ZM", "zimbabwe": "ZW",
 }
 
-# Banner
+# Indian States Ka Direct Mapping 
+# Kuch states ke STD codes / area patterns se direct match
+INDIA_STATE_KEYWORDS = {
+    "andhra pradesh": "andhra pradesh",
+    "ap": "andhra pradesh",
+    "arunachal pradesh": "arunachal pradesh",
+    "assam": "assam",
+    "bihar": "bihar",
+    "chhattisgarh": "chhattisgarh",
+    "goa": "goa",
+    "gujarat": "gujarat",
+    "haryana": "haryana",
+    "himachal pradesh": "himachal pradesh",
+    "hp": "himachal pradesh",
+    "jharkhand": "jharkhand",
+    "karnataka": "karnataka",
+    "kerala": "kerala",
+    "madhya pradesh": "madhya pradesh",
+    "mp": "madhya pradesh",
+    "maharashtra": "maharashtra",
+    "manipur": "manipur",
+    "meghalaya": "meghalaya",
+    "mizoram": "mizoram",
+    "nagaland": "nagaland",
+    "odisha": "odisha",
+    "orissa": "odisha",
+    "punjab": "punjab",
+    "rajasthan": "rajasthan",
+    "sikkim": "sikkim",
+    "tamil nadu": "tamil nadu",
+    "tn": "tamil nadu",
+    "telangana": "telangana",
+    "tripura": "tripura",
+    "uttar pradesh": "uttar pradesh",
+    "up": "uttar pradesh",
+    "uttarakhand": "uttarakhand",
+    "uk": "uttarakhand",
+    "west bengal": "west bengal",
+    "wb": "west bengal",
+    "delhi": "delhi",
+    "new delhi": "delhi",
+    "chandigarh": "chandigarh",
+    "puducherry": "puducherry",
+    "pondicherry": "puducherry",
+    "jammu and kashmir": "jammu & kashmir",
+    "jammu & kashmir": "jammu & kashmir",
+    "ladakh": "ladakh",
+    "andaman": "andaman & nicobar",
+    "andaman & nicobar": "andaman & nicobar",
+    "dadra": "dadra & nagar haveli",
+    "daman": "daman & diu",
+    "lakshadweep": "lakshadweep",
+}
+
+# US State Mapping
+US_STATE_KEYWORDS = {
+    "alabama": "alabama", "al": "alabama",
+    "alaska": "alaska", "ak": "alaska",
+    "arizona": "arizona", "az": "arizona",
+    "arkansas": "arkansas", "ar": "arkansas",
+    "california": "california", "ca": "california",
+    "colorado": "colorado", "co": "colorado",
+    "connecticut": "connecticut", "ct": "connecticut",
+    "delaware": "delaware", "de": "delaware",
+    "florida": "florida", "fl": "florida",
+    "georgia": "georgia", "ga": "georgia",
+    "hawaii": "hawaii", "hi": "hawaii",
+    "idaho": "idaho", "id": "idaho",
+    "illinois": "illinois", "il": "illinois",
+    "indiana": "indiana", "in": "indiana",
+    "iowa": "iowa", "ia": "iowa",
+    "kansas": "kansas", "ks": "kansas",
+    "kentucky": "kentucky", "ky": "kentucky",
+    "louisiana": "louisiana", "la": "louisiana",
+    "maine": "maine", "me": "maine",
+    "maryland": "maryland", "md": "maryland",
+    "massachusetts": "massachusetts", "ma": "massachusetts",
+    "michigan": "michigan", "mi": "michigan",
+    "minnesota": "minnesota", "mn": "minnesota",
+    "mississippi": "mississippi", "ms": "mississippi",
+    "missouri": "missouri", "mo": "missouri",
+    "montana": "montana", "mt": "montana",
+    "nebraska": "nebraska", "ne": "nebraska",
+    "nevada": "nevada", "nv": "nevada",
+    "new hampshire": "new hampshire", "nh": "new hampshire",
+    "new jersey": "new jersey", "nj": "new jersey",
+    "new mexico": "new mexico", "nm": "new mexico",
+    "new york": "new york", "ny": "new york",
+    "north carolina": "north carolina", "nc": "north carolina",
+    "north dakota": "north dakota", "nd": "north dakota",
+    "ohio": "ohio", "oh": "ohio",
+    "oklahoma": "oklahoma", "ok": "oklahoma",
+    "oregon": "oregon", "or": "oregon",
+    "pennsylvania": "pennsylvania", "pa": "pennsylvania",
+    "rhode island": "rhode island", "ri": "rhode island",
+    "south carolina": "south carolina", "sc": "south carolina",
+    "south dakota": "south dakota", "sd": "south dakota",
+    "tennessee": "tennessee", "tn": "tennessee",
+    "texas": "texas", "tx": "texas",
+    "utah": "utah", "ut": "utah",
+    "vermont": "vermont", "vt": "vermont",
+    "virginia": "virginia", "va": "virginia",
+    "washington": "washington", "wa": "washington",
+    "west virginia": "west virginia", "wv": "west virginia",
+    "wisconsin": "wisconsin", "wi": "wisconsin",
+    "wyoming": "wyoming", "wy": "wyoming",
+}
+
+STATE_MAP = {
+    "IN": INDIA_STATE_KEYWORDS,
+    "US": US_STATE_KEYWORDS,
+}
+
+# ─── Banner ──────────────────────────────────────────────────
 BANNER = f"""
 {Fore.CYAN}╔══════════════════════════════════════════╗
-║       {Fore.GREEN}📞 PHONEINTEL {Fore.CYAN}          ║
-║   {Fore.YELLOW}PhonE NUMBER TRACKER  {Fore.CYAN}     ║
+║       {Fore.GREEN}📞 Phoneintel{Fore.CYAN}          ║
+║   {Fore.YELLOW}Phone Number Locator    {Fore.CYAN}  ║
 ╚══════════════════════════════════════════╝
 {Style.RESET_ALL}"""
 
 def print_banner():
     print(BANNER)
 
-# Helpers 
 def clear_screen():
-    """Clear terminal screen."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
+# Extract State from Location String 
+def extract_state_from_location(location_text, iso_code):
+    """Location string se state extract karo (jaise 'Maharashtra, India' se 'Maharashtra')."""
+    if not location_text or location_text == "Unknown":
+        return None
+
+    location_lower = location_text.lower()
+    
+    # Pehle commas se split karo
+    parts = [p.strip() for p in location_lower.split(",")]
+    
+    # Country-specific state detection
+    if iso_code == "IN":
+        # Kisi bhi part mein Indian state ka naam hai?
+        for keyword, state in INDIA_STATE_KEYWORDS.items():
+            for part in parts:
+                if keyword in part:
+                    return state.title()
+        # Direct match nahi mila to pehla non-country part do
+        for part in parts:
+            if "india" not in part and part.strip():
+                return part.strip().title()
+    
+    elif iso_code == "US":
+        for keyword, state in US_STATE_KEYWORDS.items():
+            for part in parts:
+                if keyword in part:
+                    return state.title()
+        for part in parts:
+            if "united states" not in part and "usa" not in part and part.strip():
+                return part.strip().title()
+    
+    # Fallback: pehla meaningful part
+    for part in parts:
+        country_variants = ["india", "united states", "usa", "uk", "united kingdom", 
+                           "germany", "australia", "canada", "china", "japan"]
+        if part.strip() and part.strip() not in country_variants:
+            return part.strip().title()
+    
+    return None
+
+# Country Prompt
 def country_prompt():
-    """Ask user for country and return ISO country code."""
     print(f"\n{Fore.YELLOW}[?] Enter the country name (e.g., India, USA, Germany):{Style.RESET_ALL}")
     country_input = input(f"{Fore.CYAN}└─> {Style.RESET_ALL}").strip().lower()
 
@@ -108,13 +259,45 @@ def country_prompt():
         iso_code = input(f"{Fore.CYAN}└─> {Style.RESET_ALL}").strip().upper()
         return iso_code, country_input.title()
 
+# State Prompt
+def state_prompt(iso_code):
+    """Puchho ki user state batana chahta hai ya nahi."""
+    print(f"\n{Fore.YELLOW}[?] Do you know which state this number belongs to? (y/n){Style.RESET_ALL}")
+    choice = input(f"{Fore.CYAN}└─> {Style.RESET_ALL}").strip().lower()
+    
+    if choice in ["y", "yes", "yeah", "ha", "h", "haan"]:
+        print(f"\n{Fore.YELLOW}[?] Enter the state name (e.g., Maharashtra, California, Texas):{Style.RESET_ALL}")
+        user_state = input(f"{Fore.CYAN}└─> {Style.RESET_ALL}").strip().lower()
+        
+        # Check in state map
+        state_map_for_country = STATE_MAP.get(iso_code, {})
+        matched_state = None
+        for keyword, state in state_map_for_country.items():
+            if keyword == user_state or user_state in keyword or keyword in user_state:
+                matched_state = state
+                break
+        
+        if matched_state:
+            print(f"{Fore.GREEN}[✓] State recognized: {matched_state.title()}{Style.RESET_ALL}")
+            return matched_state
+        else:
+            print(f"{Fore.YELLOW}[!] State '{user_state.title()}' not in our database. Will auto-detect.{Style.RESET_ALL}")
+            return user_state
+    
+    elif choice in ["n", "no", "nahi", "nhi"]:
+        print(f"{Fore.CYAN}[*] No problem! Will auto-detect the state from the number.{Style.RESET_ALL}")
+        return None
+    
+    else:
+        print(f"{Fore.YELLOW}[!] Didn't understand. Will auto-detect.{Style.RESET_ALL}")
+        return None
+
+#  Phone Prompt 
 def phone_prompt(iso_code):
-    """Ask user for phone number and parse it."""
     print(f"\n{Fore.YELLOW}[?] Enter the phone number (without country code; e.g., 9876543210):{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}    Or enter with '+' and full country code (e.g., +919876543210):{Style.RESET_ALL}")
     number_input = input(f"{Fore.CYAN}└─> {Style.RESET_ALL}").strip()
 
-    # If user provided full international format
     if number_input.startswith("+"):
         raw_number = number_input
     else:
@@ -130,55 +313,58 @@ def phone_prompt(iso_code):
         print(f"{Fore.RED}[✗] Error parsing number: {e}{Style.RESET_ALL}")
         return None
 
-def get_location_info(parsed):
-    """Extract location, carrier, timezone from parsed number."""
+# Get Location Info 
+    def get_location_info(parsed):
     info = {}
-
-    # Location (region/state/city)
+    
     location = geocoder.description_for_number(parsed, "en")
     info["location"] = location if location else "Unknown"
-
-    # Carrier / Service Provider
+    
     carrier_name = carrier.name_for_number(parsed, "en")
     info["carrier"] = carrier_name if carrier_name else "Unknown"
-
-    # Timezone(s)
+    
     tz_list = timezone.time_zones_for_number(parsed)
     info["timezones"] = ", ".join(tz_list) if tz_list else "Unknown"
-
-    # Country code and national number
+    
     info["country_code"] = f"+{parsed.country_code}"
     info["national_number"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
     info["international_number"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
-
-    # Number type
+    
     number_type_map = {
-        0: "Fixed Line",
-        1: "Mobile",
-        2: "Fixed Line or Mobile",
-        3: "Toll Free",
-        4: "Premium Rate",
-        5: "Shared Cost",
-        6: "VoIP",
-        7: "Personal Number",
-        8: "Pager",
-        9: "Universal Access Number",
-        10: "Voicemail",
+        0: "Fixed Line", 1: "Mobile", 2: "Fixed Line or Mobile",
+        3: "Toll Free", 4: "Premium Rate", 5: "Shared Cost",
+        6: "VoIP", 7: "Personal Number", 8: "Pager",
+        9: "Universal Access Number", 10: "Voicemail",
     }
     ntype = phonenumbers.number_type(parsed)
     info["number_type"] = number_type_map.get(ntype, "Unknown")
-
-    # Is possible / valid
     info["is_valid"] = phonenumbers.is_valid_number(parsed)
     info["is_possible"] = phonenumbers.is_possible_number(parsed)
-
+    
     return info
 
+# State Match Check 
+def check_state_match(detected_state, user_state, iso_code):
+    """Check karo ki user ka diya hua state, detected state se match karta hai ya nahi."""
+    if not user_state or not detected_state:
+        return None  # Koi comparison possible nahi
+    
+    user_lower = user_state.lower().strip()
+    detected_lower = detected_state.lower().strip()
+    
+    if user_lower == detected_lower:
+        return True
+    # Partial match bhi check karo
+    if user_lower in detected_lower or detected_lower in user_lower:
+        return True
+    
+    return False
+
+# Geocode with OpenCage 
 def geocode_with_opencage(location_name):
-    """Use OpenCage API to get lat/lng for a location."""
     if not OPENCAGE_API_KEY:
         return None, None, None
-
+    
     url = "https://api.opencagedata.com/geocode/v1/json"
     params = {
         "q": location_name,
@@ -186,7 +372,7 @@ def geocode_with_opencage(location_name):
         "language": "en",
         "limit": 1,
     }
-
+    
     try:
         resp = requests.get(url, params=params, timeout=10)
         data = resp.json()
@@ -199,115 +385,132 @@ def geocode_with_opencage(location_name):
         print(f"{Fore.YELLOW}[!] Geocoding API error: {e}{Style.RESET_ALL}")
         return None, None, None
 
+# Generate Map 
 def generate_map(lat, lng, location_name, number_info):
-    """Generate an interactive HTML map using Folium."""
     try:
         import folium
     except ImportError:
-        print(f"{Fore.YELLOW}[!] Folium not installed. Skipping map generation.{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}    Install with: pip install folium{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}[!] Folium not installed. Skipping map.{Style.RESET_ALL}")
         return
-
-    # Clean number for filename
+    
     clean_num = number_info["international_number"].replace(" ", "_").replace("+", "")
     filename = f"location_{clean_num}.html"
-
+    
     my_map = folium.Map(location=[lat, lng], zoom_start=10)
-
+    
     popup_text = f"""
-    <b>📍 Phone Number:</b> {number_info['international_number']}<br>
+    <b>📍 Number:</b> {number_info['international_number']}<br>
     <b>🌍 Location:</b> {location_name}<br>
     <b>📡 Carrier:</b> {number_info['carrier']}<br>
     <b>📄 Type:</b> {number_info['number_type']}<br>
     <b>🕐 Timezone:</b> {number_info['timezones']}
     """
-
+    
     folium.Marker(
         [lat, lng],
         popup=folium.Popup(popup_text, max_width=350),
         tooltip=location_name,
         icon=folium.Icon(color="red", icon="phone", prefix="fa")
     ).add_to(my_map)
-
+    
     my_map.save(filename)
     print(f"{Fore.GREEN}[✓] Map saved: {filename}{Style.RESET_ALL}")
 
-def display_results(info, lat=None, lng=None, geocoded_location=None):
-    """Display all gathered information."""
+# Display Results 
+def display_results(info, detected_state, user_state, state_match, lat=None, lng=None):
+    """Sab kuch display karo with state comparison."""
     print(f"\n{Fore.CYAN}══════════════════════════════════════════{Style.RESET_ALL}")
     print(f"{Fore.GREEN}📊 PHONE NUMBER INTELLIGENCE REPORT{Style.RESET_ALL}")
     print(f"{Fore.CYAN}══════════════════════════════════════════{Style.RESET_ALL}")
-
+    
     print(f"\n{Fore.YELLOW}📞 Number Information:{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}International:{Style.RESET_ALL}    {Fore.GREEN}{info['international_number']}{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}National:{Style.RESET_ALL}         {Fore.GREEN}{info['national_number']}{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}Country Code:{Style.RESET_ALL}     {Fore.GREEN}{info['country_code']}{Style.RESET_ALL}")
-    print(f"  {Fore.WHITE}Valid Number:{Style.RESET_ALL}     {'✅ Yes' if info['is_valid'] else '❌ No'}")
+    print(f"  {Fore.WHITE}Valid:{Style.RESET_ALL}            {'✅ Yes' if info['is_valid'] else '❌ No'}")
     print(f"  {Fore.WHITE}Possible:{Style.RESET_ALL}         {'✅ Yes' if info['is_possible'] else '❌ No'}")
-
-    print(f"\n{Fore.YELLOW}🌍 Location & Network:{Style.RESET_ALL}")
-    print(f"  {Fore.WHITE}Region/Area:{Style.RESET_ALL}      {Fore.GREEN}{info['location']}{Style.RESET_ALL}")
+    
+    print(f"\n{Fore.YELLOW}📌 Location & State:{Style.RESET_ALL}")
+    print(f"  {Fore.WHITE}Full Location:{Style.RESET_ALL}    {Fore.GREEN}{info['location']}{Style.RESET_ALL}")
+    print(f"  {Fore.WHITE}Detected State:{Style.RESET_ALL}   {Fore.CYAN}{detected_state if detected_state else 'Could not determine'}{Style.RESET_ALL}")
+    
+    # State match result
+    if user_state:
+        print(f"  {Fore.WHITE}You entered:{Style.RESET_ALL}      {Fore.YELLOW}{user_state.title()}{Style.RESET_ALL}")
+        if state_match is True:
+            print(f"  {Fore.GREEN}✅ MATCH: Number IS registered in {user_state.title()}{Style.RESET_ALL}")
+        elif state_match is False:
+            print(f"  {Fore.RED}❌ MISMATCH: Number is registered in {detected_state}, NOT {user_state.title()}{Style.RESET_ALL}")
+        else:
+            print(f"  {Fore.YELLOW}⚠️  Could not verify state match.{Style.RESET_ALL}")
+    
+    print(f"\n{Fore.YELLOW}📡 Network Info:{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}Carrier:{Style.RESET_ALL}          {Fore.GREEN}{info['carrier']}{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}Number Type:{Style.RESET_ALL}      {Fore.GREEN}{info['number_type']}{Style.RESET_ALL}")
     print(f"  {Fore.WHITE}Timezone(s):{Style.RESET_ALL}      {Fore.GREEN}{info['timezones']}{Style.RESET_ALL}")
-
+    
     if lat and lng:
-        print(f"\n{Fore.YELLOW}🗺️ Geolocation (from OpenCage):{Style.RESET_ALL}")
+        print(f"\n{Fore.YELLOW}🗺️ Coordinates (approx):{Style.RESET_ALL}")
         print(f"  {Fore.WHITE}Latitude:{Style.RESET_ALL}       {Fore.GREEN}{lat}{Style.RESET_ALL}")
         print(f"  {Fore.WHITE}Longitude:{Style.RESET_ALL}      {Fore.GREEN}{lng}{Style.RESET_ALL}")
-        if geocoded_location:
-            print(f"  {Fore.WHITE}Address:{Style.RESET_ALL}        {Fore.GREEN}{geocoded_location}{Style.RESET_ALL}")
-
+    
     print(f"{Fore.CYAN}══════════════════════════════════════════{Style.RESET_ALL}")
 
-# Main
+# Main Function 
 def main():
     clear_screen()
     print_banner()
-
-    # Load config
+    
+    # Config load karo
     config_loaded = load_config()
     if not config_loaded:
-        print(f"{Fore.YELLOW}[!] No config.py found. Running in basic mode (no map/geocoding).{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}    To enable maps, copy config.py.example to config.py and add your API key.{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}[!] No config.py found. Running in basic mode.{Style.RESET_ALL}")
     else:
-        print(f"{Fore.GREEN}[✓] Config loaded. Map generation enabled.{Style.RESET_ALL}")
-
-    # Step 1: Ask for country
+        print(f"{Fore.GREEN}[✓] Config loaded.{Style.RESET_ALL}")
+    
+    # Step 1: Country
     iso_code, country_name = country_prompt()
-
-    # Step 2: Ask for phone number
+    
+    # Step 2: State (optional — user bata sakta hai ya nahi)
+    user_state = state_prompt(iso_code)
+    
+    # Step 3: Phone number
     parsed = phone_prompt(iso_code)
     if not parsed:
         print(f"{Fore.RED}[✗] Could not parse number. Exiting.{Style.RESET_ALL}")
         sys.exit(1)
-
-    # Step 3: Extract info
+    
+    # Step 4: Info extract karo
     info = get_location_info(parsed)
-
-    # Step 4: Geocode if API key available
-    lat = lng = geocoded_location = None
-    if config_loaded and OPENCAGE_API_KEY and info["location"] != "Unknown":
-        print(f"{Fore.CYAN}[*] Geocoding location via OpenCage...{Style.RESET_ALL}")
-        lat, lng, geocoded_location = geocode_with_opencage(info["location"])
-
-    # Step 5: Display results
-    display_results(info, lat, lng, geocoded_location)
-
-    # Step 6: Generate map if geocoded
+    
+    # Step 5: State detect karo location string se
+    detected_state = extract_state_from_location(info["location"], iso_code)
+    
+    # Step 6: Match check
+    state_match = check_state_match(detected_state, user_state, iso_code)
+    
+    # Step 7: Geocode (agar API key ho)
+    lat = lng = None
+    search_location = detected_state if detected_state else info["location"]
+    if config_loaded and OPENCAGE_API_KEY and search_location:
+        print(f"{Fore.CYAN}[*] Geocoding location...{Style.RESET_ALL}")
+        lat, lng, _ = geocode_with_opencage(search_location)
+    
+    # Step 8: Display
+    display_results(info, detected_state, user_state, state_match, lat, lng)
+    
+    # Step 9: Map
     if lat and lng:
-        generate_map(lat, lng, info["location"], info)
-    elif config_loaded and not lat:
-        print(f"{Fore.YELLOW}[!] Could not geocode location. Map not generated.{Style.RESET_ALL}")
-
+        generate_map(lat, lng, f"{search_location}, {country_name}", info)
+    
     print(f"\n{Fore.CYAN}[✓] Done!{Style.RESET_ALL}")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n{Fore.YELLOW}[!] Interrupted by user. Exiting.{Style.RESET_ALL}")
+        print(f"\n{Fore.YELLOW}[!] Interrupted. Exiting.{Style.RESET_ALL}")
         sys.exit(0)
 # BY SAKSHAM GUPTA
-# INSTA ID _vibecode
-#DISCORD ID _obito_gupta
+# INSTA ID - _vibecoder
+#DISCORD ID - _obito_gupta_
