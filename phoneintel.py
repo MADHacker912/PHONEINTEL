@@ -313,36 +313,47 @@ def phone_prompt(iso_code):
         print(f"{Fore.RED}[✗] Error parsing number: {e}{Style.RESET_ALL}")
         return None
 
-# Get Location Info 
-    def get_location_info(parsed):
+# Get Location Info
+def get_location_info(parsed):
     info = {}
-    
+
     location = geocoder.description_for_number(parsed, "en")
     info["location"] = location if location else "Unknown"
-    
+
     carrier_name = carrier.name_for_number(parsed, "en")
     info["carrier"] = carrier_name if carrier_name else "Unknown"
-    
+
     tz_list = timezone.time_zones_for_number(parsed)
     info["timezones"] = ", ".join(tz_list) if tz_list else "Unknown"
-    
+
     info["country_code"] = f"+{parsed.country_code}"
-    info["national_number"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
-    info["international_number"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
-    
+    info["national_number"] = phonenumbers.format_number(
+        parsed, phonenumbers.PhoneNumberFormat.NATIONAL
+    )
+    info["international_number"] = phonenumbers.format_number(
+        parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL
+    )
+
     number_type_map = {
-        0: "Fixed Line", 1: "Mobile", 2: "Fixed Line or Mobile",
-        3: "Toll Free", 4: "Premium Rate", 5: "Shared Cost",
-        6: "VoIP", 7: "Personal Number", 8: "Pager",
-        9: "Universal Access Number", 10: "Voicemail",
+        0: "Fixed Line",
+        1: "Mobile",
+        2: "Fixed Line or Mobile",
+        3: "Toll Free",
+        4: "Premium Rate",
+        5: "Shared Cost",
+        6: "VoIP",
+        7: "Personal Number",
+        8: "Pager",
+        9: "Universal Access Number",
+        10: "Voicemail",
     }
+
     ntype = phonenumbers.number_type(parsed)
     info["number_type"] = number_type_map.get(ntype, "Unknown")
     info["is_valid"] = phonenumbers.is_valid_number(parsed)
     info["is_possible"] = phonenumbers.is_possible_number(parsed)
-    
-    return info
 
+    return info
 # State Match Check 
 def check_state_match(detected_state, user_state, iso_code):
     """Check karo ki user ka diya hua state, detected state se match karta hai ya nahi."""
