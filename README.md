@@ -65,9 +65,9 @@ Possible      : Yes
 ```bash
 git clone https://github.com/yourusername/PhoneNum-Locator.git
 
-cd PhoneNum-Locator
+cd PHONEINTEL
 
-pip install -r requirements.txt
+ sudo apt install -r requirements.txt
 ````
 
 ---
@@ -81,7 +81,7 @@ pkg install python git -y
 
 git clone https://github.com/yourusername/PhoneNum-Locator.git
 
-cd PhoneNum-Locator
+cd PHONEINTEL
 
 pip install -r requirements.txt
 ```
@@ -93,7 +93,7 @@ pip install -r requirements.txt
 Simply run
 
 ```bash
-python phonenum_locator.py
+python3 phoneintel.py
 ```
 
 ---
@@ -102,10 +102,10 @@ python phonenum_locator.py
 
 Get a free API key from **OpenCage Geocoding**.
 
-Create the configuration file:
+Open the configuration file:
 
 ```bash
-cp config.py.example config.py
+cd config.py
 ```
 
 Edit it:
