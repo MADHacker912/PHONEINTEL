@@ -66,8 +66,8 @@ Possible      : Yes
 git clone https://github.com/yourusername/PhoneNum-Locator.git
 
 cd PHONEINTEL
-
- sudo apt install -r requirements.txt
+sudo apt install python3 
+pip install -r requirements.txt
 ````
 
 ---
